@@ -1088,3 +1088,15 @@ footer .logo {
 }
 .eye-toggle:hover { opacity: 1; }
 .login-overlay.dtheme .eye-toggle { color: rgba(255,255,255,0.8); }
+
+/* ── Indicador de força de senha ── */
+.pwd-strength { margin-top: 8px; }
+.pwd-strength.hidden { display: none; }
+.pwd-bar { height: 5px; background: rgba(0,0,0,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+.login-overlay.dtheme .pwd-bar { background: rgba(255,255,255,0.1); }
+.pwd-fill { height: 100%; width: 0; border-radius: 3px; transition: width 0.3s, background 0.3s; }
+.pwd-rules { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.pwd-rules li { font-size: 0.73rem; color: rgba(0,0,0,0.45); transition: color 0.2s; }
+.login-overlay.dtheme .pwd-rules li { color: rgba(255,255,255,0.35); }
+.pwd-rules li.ok { color: #27ae60; }
+.login-overlay.dtheme .pwd-rules li.ok { color: #2ecc71; }

@@ -193,6 +193,17 @@
             </svg>
           </button>
         </div>
+        <!-- Indicador de força de senha (cadastro / redefinição) -->
+        <div class="pwd-strength hidden" id="pwd-strength">
+          <div class="pwd-bar"><div class="pwd-fill" id="pwd-fill"></div></div>
+          <ul class="pwd-rules">
+            <li id="rule-len">✗ Mínimo 8 caracteres</li>
+            <li id="rule-upper">✗ Uma letra maiúscula (A-Z)</li>
+            <li id="rule-lower">✗ Uma letra minúscula (a-z)</li>
+            <li id="rule-num">✗ Um número (0-9)</li>
+            <li id="rule-special">✗ Um caractere especial (!@#$%...)</li>
+          </ul>
+        </div>
       </div>
 
       <div class="login-field" id="field-forgot">

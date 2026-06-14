@@ -27,6 +27,19 @@ const fromEmail    = process.env.RESEND_FROM_EMAIL || 'Redefi <onboarding@resend
 const resend       = resendApiKey ? new Resend(resendApiKey) : null;
 if (!resend) console.warn('[Redefi] RESEND_API_KEY não encontrado — envio de e-mails desativado.');
 
+/* ── Validação de senha forte ──
+   Mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número, 1 caractere especial */
+function isPasswordStrong(password) {
+  if (typeof password !== 'string' || password.length < 8) return false;
+  if (!/[A-Z]/.test(password)) return false;
+  if (!/[a-z]/.test(password)) return false;
+  if (!/[0-9]/.test(password)) return false;
+  if (!/[!@#$%^&*()\-_=+\[\]{};:'",.<>?/\\|`~]/.test(password)) return false;
+  return true;
+}
+const PASSWORD_REQUIREMENTS_MSG =
+  'A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, minúscula, número e caractere especial.';
+
 /* ── Stores em memória ── */
 const otpStore   = new Map(); // cadastro
 const resetStore = new Map(); // redefinição de senha
@@ -130,6 +143,7 @@ app.post('/api/send-otp', async (req, res) => {
 app.post('/api/verify-otp', async (req, res) => {
   const { email, code, password } = req.body || {};
   if (!email || !code || !password) return res.status(400).json({ error: 'Dados incompletos.' });
+  if (!isPasswordStrong(password)) return res.status(400).json({ error: PASSWORD_REQUIREMENTS_MSG });
 
   const stored = otpStore.get(email);
   if (!stored)                        return res.status(400).json({ error: 'Código não encontrado. Solicite um novo.' });
@@ -201,7 +215,7 @@ app.post('/api/send-reset', async (req, res) => {
 app.post('/api/verify-reset', async (req, res) => {
   const { email, code, newPassword } = req.body || {};
   if (!email || !code || !newPassword) return res.status(400).json({ error: 'Dados incompletos.' });
-  if (newPassword.length < 6) return res.status(400).json({ error: 'Nova senha deve ter pelo menos 6 caracteres.' });
+  if (!isPasswordStrong(newPassword)) return res.status(400).json({ error: PASSWORD_REQUIREMENTS_MSG });
 
   const stored = resetStore.get(email);
   if (!stored)                        return res.status(400).json({ error: 'Código não encontrado. Solicite um novo.' });

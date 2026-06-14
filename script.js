@@ -99,6 +99,41 @@ document.querySelectorAll('[data-key]').forEach(card =>
 );
 
 /* ─────────────────────────────────────────────
+   4.5 — FORÇA DA SENHA
+───────────────────────────────────────────── */
+const PWD_RULES = {
+  len:     { test: p => p.length >= 8,                                     label: 'Mínimo 8 caracteres' },
+  upper:   { test: p => /[A-Z]/.test(p),                                    label: 'Uma letra maiúscula (A-Z)' },
+  lower:   { test: p => /[a-z]/.test(p),                                    label: 'Uma letra minúscula (a-z)' },
+  num:     { test: p => /[0-9]/.test(p),                                    label: 'Um número (0-9)' },
+  special: { test: p => /[!@#$%^&*()\-_=+\[\]{};:'",.<>?/\\|`~]/.test(p),   label: 'Um caractere especial (!@#$%...)' }
+};
+function isPasswordStrong(p) { return Object.values(PWD_RULES).every(r => r.test(p)); }
+
+function updateStrengthUI(password) {
+  const box = $id('pwd-strength');
+  if (!box) return;
+  if (!password) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  let passed = 0;
+  Object.entries(PWD_RULES).forEach(([key, rule]) => {
+    const ok = rule.test(password);
+    if (ok) passed++;
+    const el = $id(`rule-${key}`);
+    if (el) { el.classList.toggle('ok', ok); el.textContent = `${ok ? '✓' : '✗'} ${rule.label}`; }
+  });
+  const fill = $id('pwd-fill');
+  if (fill) {
+    fill.style.width = `${(passed / 5) * 100}%`;
+    fill.style.background = passed <= 1 ? '#e74c3c' : passed <= 2 ? '#e67e22' : passed <= 3 ? '#f1c40f' : passed <= 4 ? '#2ecc71' : '#27ae60';
+  }
+}
+function hideStrengthUI() {
+  const box = $id('pwd-strength');
+  if (box) box.classList.add('hidden');
+}
+
+/* ─────────────────────────────────────────────
    5. MODAL DE LOGIN
 ───────────────────────────────────────────── */
 const loginOverlay    = $id('login-overlay');
@@ -153,6 +188,7 @@ function closeLoginModal() {
   if (eyeOpen)   eyeOpen.style.display   = '';
   if (eyeClosed) eyeClosed.style.display = 'none';
   if (fieldForgot) fieldForgot.style.display = '';
+  hideStrengthUI();
   loginOverlay.classList.remove('open');
   document.body.style.overflow = '';
   clearLoginAlert();
@@ -171,6 +207,7 @@ function setScreen(screen) {
   if (eyeOpen)   eyeOpen.style.display   = '';
   if (eyeClosed) eyeClosed.style.display = 'none';
   if (fieldForgot) fieldForgot.style.display = '';
+  hideStrengthUI();
   const isNew = screen === 'new';
   loginOverlay.classList.toggle('ltheme', isNew);
   loginOverlay.classList.toggle('dtheme', !isNew);
@@ -179,6 +216,7 @@ function setScreen(screen) {
   loginToggle.textContent     = isNew ? '🌙 Já tenho conta' : '☀️ Primeira vez';
   fieldSenha.classList.remove('hidden');
   fieldCodigo.classList.add('hidden');
+  loginSenha.placeholder = isNew ? 'crie uma senha forte' : '••••••••';
   loginSwitchMsg.textContent  = isNew ? 'Já tem uma conta?' : 'Primeira vez aqui?';
   loginSwitchLink.textContent = isNew ? 'Entrar →' : '← Criar conta';
   loginEmail.value = ''; loginSenha.value = ''; loginCodigo.value = '';
@@ -192,6 +230,7 @@ function goToCodeStep(email) {
   loginEmail.readOnly = true; loginEmail.style.opacity = '0.55';
   fieldSenha.classList.add('hidden');
   fieldCodigo.classList.remove('hidden');
+  hideStrengthUI();
   loginCodigo.value = '';
   loginCodigo.setAttribute('inputmode','numeric'); loginCodigo.setAttribute('pattern','[0-9]*');
   loginHeading.textContent    = 'Verifique seu e-mail';
@@ -209,6 +248,7 @@ function goToResetStep(email) {
   fieldCodigo.classList.remove('hidden');
   fieldSenha.classList.remove('hidden');
   if (senhaLabel) senhaLabel.textContent = 'nova senha:';
+  loginSenha.placeholder = 'crie uma senha forte';
   /* Esconde "Esqueci minha senha" — não faz sentido no passo de reset */
   if (fieldForgot) fieldForgot.style.display = 'none';
   /* Garante que senha fique oculta ao entrar na tela */
@@ -216,6 +256,7 @@ function goToResetStep(email) {
   if (eyeOpen)   eyeOpen.style.display   = '';
   if (eyeClosed) eyeClosed.style.display = 'none';
   loginSenha.value = ''; loginCodigo.value = '';
+  hideStrengthUI();
   loginCodigo.setAttribute('inputmode','numeric'); loginCodigo.setAttribute('pattern','[0-9]*');
   loginHeading.textContent    = 'Redefina sua senha';
   loginBtnSubmit.textContent  = 'REDEFINIR SENHA';
@@ -239,7 +280,17 @@ function validateLoginFields() {
   if (!email)               { shakeInput(loginEmail); showLoginAlert('Preencha o e-mail.','err');            return false; }
   if (!isValidEmail(email)) { shakeInput(loginEmail); showLoginAlert('E-mail inválido.','err');              return false; }
   if (!loginSenha.value)    { shakeInput(loginSenha); showLoginAlert('Preencha a senha.','err');             return false; }
-  if (loginSenha.value.length < 6) { shakeInput(loginSenha); showLoginAlert('Senha mínima: 6 caracteres.','err'); return false; }
+  /* Cadastro exige senha forte: 8+ caracteres, maiúscula, minúscula, número e especial */
+  if (LS.screen === 'new' && !isPasswordStrong(loginSenha.value)) {
+    shakeInput(loginSenha);
+    showLoginAlert('A senha não atende aos requisitos de segurança.','err');
+    updateStrengthUI(loginSenha.value);
+    return false;
+  }
+  /* Login: apenas garante que não está vazio (a força já foi exigida no cadastro) */
+  if (LS.screen === 'user' && loginSenha.value.length < 1) {
+    shakeInput(loginSenha); showLoginAlert('Preencha a senha.','err'); return false;
+  }
   return true;
 }
 
@@ -359,7 +410,12 @@ async function handleResetVerify() {
   const code=loginCodigo.value.trim();
   const newPassword=loginSenha.value; /* NÃO faz trim — preserva intenção do usuário */
   if (!code||!/^\d{6}$/.test(code)) { shakeInput(loginCodigo); showLoginAlert('Digite o código de 6 dígitos.','err'); return; }
-  if (!newPassword||newPassword.length<6) { shakeInput(loginSenha); showLoginAlert('Nova senha: mínimo 6 caracteres.','err'); return; }
+  if (!newPassword||!isPasswordStrong(newPassword)) {
+    shakeInput(loginSenha);
+    showLoginAlert('A nova senha não atende aos requisitos de segurança.','err');
+    updateStrengthUI(newPassword);
+    return;
+  }
   if (!pendingReset) { showLoginAlert('Sessão expirada. Tente novamente.','err'); setScreen('user'); return; }
   try {
     const res=await fetch('/api/verify-reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:pendingReset.email,code,newPassword})});
@@ -420,6 +476,13 @@ loginSwitchLink.addEventListener('click',()=>{ if(LS.step==='code'||LS.step==='r
 [loginEmail,loginSenha,loginCodigo].forEach(input=>{
   input.addEventListener('keydown',e=>{if(e.key==='Enter')handleLoginSubmit();});
   input.addEventListener('input',()=>{input.classList.remove('shake');clearLoginAlert();});
+});
+
+/* Indicador de força — ativo no cadastro (passo 1) e na redefinição (passo reset) */
+loginSenha.addEventListener('input', () => {
+  if ((LS.screen === 'new' && LS.step === 'form') || LS.step === 'reset') {
+    updateStrengthUI(loginSenha.value);
+  }
 });
 
 /* ─────────────────────────────────────────────
