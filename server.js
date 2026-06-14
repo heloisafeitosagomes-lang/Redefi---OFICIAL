@@ -2,7 +2,7 @@ const express  = require('express');
 const cors     = require('cors');
 const dotenv   = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 dotenv.config({ path: '.env.local' });
 
@@ -21,34 +21,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { persistSession: false, autoRefreshToken: false }
 });
 
-/* ── Gmail SMTP (Nodemailer) ──
-   Configure no .env.local:
-     GMAIL_USER         = seu-email@gmail.com
-     GMAIL_APP_PASSWORD = senha de app de 16 caracteres (sem espaços)
-   Como gerar: myaccount.google.com/apppasswords (requer verificação em 2 etapas) */
-const gmailUser = process.env.GMAIL_USER;
-const gmailPass = process.env.GMAIL_APP_PASSWORD;
-const fromEmail = gmailUser ? `Redefi <${gmailUser}>` : null;
-
-let mailer = null;
-if (gmailUser && gmailPass) {
-  mailer = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: gmailUser, pass: gmailPass.replace(/\s+/g, '') }
-  });
-} else {
-  console.warn('[Redefi] GMAIL_USER / GMAIL_APP_PASSWORD não encontrados — envio de e-mails desativado.');
-}
-
-/* Helper: envia e-mail via Gmail SMTP — retorna { error } no mesmo formato usado antes */
-async function sendMail({ to, subject, html }) {
-  try {
-    await mailer.sendMail({ from: fromEmail, to, subject, html });
-    return { error: null };
-  } catch (err) {
-    return { error: err };
-  }
-}
+/* ── Resend ── */
+const resendApiKey = process.env.RESEND_API_KEY;
+const fromEmail    = process.env.RESEND_FROM_EMAIL || 'Redefi <onboarding@resend.dev>';
+const resend       = resendApiKey ? new Resend(resendApiKey) : null;
+if (!resend) console.warn('[Redefi] RESEND_API_KEY não encontrado — envio de e-mails desativado.');
 
 /* ── Validação de senha forte ──
    Mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número, 1 caractere especial */
@@ -132,8 +109,8 @@ app.post('/api/send-otp', async (req, res) => {
   const { email } = req.body || {};
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ error: 'E-mail inválido.' });
-  if (!mailer)
-    return res.status(503).json({ error: 'Serviço de e-mail não configurado. Adicione GMAIL_USER e GMAIL_APP_PASSWORD no .env.local' });
+  if (!resend)
+    return res.status(503).json({ error: 'Serviço de e-mail não configurado. Adicione RESEND_API_KEY no .env.local' });
 
   const existingUser = await getUserByEmail(email);
   if (existingUser?.email_confirmed_at)
@@ -147,15 +124,15 @@ app.post('/api/send-otp', async (req, res) => {
   otpStore.set(email, { code, expiresAt: Date.now() + 10 * 60_000 });
 
   try {
-    const { error } = await sendMail({
-      to: email,
+    const { error } = await resend.emails.send({
+      from: fromEmail, to: email,
       subject: `${code} — seu código de verificação Redefi`,
       html: buildOtpEmail(code)
     });
-    if (error) { console.error('[Gmail OTP]', error); return res.status(500).json({ error: 'Falha ao enviar e-mail.' }); }
+    if (error) { console.error('[Resend OTP]', error); return res.status(500).json({ error: 'Falha ao enviar e-mail.' }); }
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[Gmail OTP exception]', err);
+    console.error('[Resend OTP exception]', err);
     return res.status(500).json({ error: err.message || 'Falha ao enviar e-mail.' });
   }
 });
@@ -194,14 +171,14 @@ app.post('/api/verify-otp', async (req, res) => {
 });
 
 /* ══════════════════════════════════════════════
-   POST /api/send-reset  (redefinição de senha via Gmail SMTP)
+   POST /api/send-reset  (redefinição de senha via Resend)
    Não usa o Supabase para enviar e-mail — sem rate limit.
 ══════════════════════════════════════════════ */
 app.post('/api/send-reset', async (req, res) => {
   const { email } = req.body || {};
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ error: 'E-mail inválido.' });
-  if (!mailer)
+  if (!resend)
     return res.status(503).json({ error: 'Serviço de e-mail não configurado.' });
 
   /* Verifica se o usuário existe (sem revelar caso não exista) */
@@ -219,15 +196,15 @@ app.post('/api/send-reset', async (req, res) => {
   resetStore.set(email, { code, userId: user.id, expiresAt: Date.now() + 10 * 60_000 });
 
   try {
-    const { error } = await sendMail({
-      to: email,
+    const { error } = await resend.emails.send({
+      from: fromEmail, to: email,
       subject: `${code} — redefinição de senha Redefi`,
       html: buildResetEmail(code)
     });
-    if (error) { console.error('[Gmail Reset]', error); return res.status(500).json({ error: 'Falha ao enviar e-mail.' }); }
+    if (error) { console.error('[Resend Reset]', error); return res.status(500).json({ error: 'Falha ao enviar e-mail.' }); }
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[Gmail Reset exception]', err);
+    console.error('[Resend Reset exception]', err);
     return res.status(500).json({ error: err.message || 'Falha ao enviar e-mail.' });
   }
 });

@@ -374,11 +374,11 @@ async function handleSignIn() {
 }
 
 /* ────────────────────────────────────────────────────────────
-   REDEFINIÇÃO DE SENHA — via Gmail SMTP (sem rate limit do Supabase)
+   REDEFINIÇÃO DE SENHA — via Resend (sem rate limit do Supabase)
 
    Fluxo:
      1. Usuário digita o e-mail e clica "Esqueci minha senha"
-     2. Servidor envia código pelo Gmail  (/api/send-reset)
+     2. Servidor envia código pelo Resend  (/api/send-reset)
      3. Modal muda para passo 'reset': campo código + nova senha
      4. Usuário preenche e clica "REDEFINIR SENHA"
      5. Servidor valida e atualiza a senha  (/api/verify-reset)
